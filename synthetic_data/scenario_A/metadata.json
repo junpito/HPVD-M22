@@ -1,0 +1,449 @@
+{
+  "scenario_name": "scenario_A",
+  "total_bundles": 21,
+  "historical_count": 20,
+  "query_count": 1,
+  "bundles": [
+    {
+      "bundle_id": "scenario_A_hist_000",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_000.npy",
+      "dna_file": "dna\\scenario_A_hist_000.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_000",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-01T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_001",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_001.npy",
+      "dna_file": "dna\\scenario_A_hist_001.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_001",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-02T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_002",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_002.npy",
+      "dna_file": "dna\\scenario_A_hist_002.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_002",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-03T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_003",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_003.npy",
+      "dna_file": "dna\\scenario_A_hist_003.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_003",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-04T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_004",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_004.npy",
+      "dna_file": "dna\\scenario_A_hist_004.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_004",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-05T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_005",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_005.npy",
+      "dna_file": "dna\\scenario_A_hist_005.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_005",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-06T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_006",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_006.npy",
+      "dna_file": "dna\\scenario_A_hist_006.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_006",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-07T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_007",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_007.npy",
+      "dna_file": "dna\\scenario_A_hist_007.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_007",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-08T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_008",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_008.npy",
+      "dna_file": "dna\\scenario_A_hist_008.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_008",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-09T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_009",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_009.npy",
+      "dna_file": "dna\\scenario_A_hist_009.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_009",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-10T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_010",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_010.npy",
+      "dna_file": "dna\\scenario_A_hist_010.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_010",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-11T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_011",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_011.npy",
+      "dna_file": "dna\\scenario_A_hist_011.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_011",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-12T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_012",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_012.npy",
+      "dna_file": "dna\\scenario_A_hist_012.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_012",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-13T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_013",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_013.npy",
+      "dna_file": "dna\\scenario_A_hist_013.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_013",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-14T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_014",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_014.npy",
+      "dna_file": "dna\\scenario_A_hist_014.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_014",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-15T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_015",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_015.npy",
+      "dna_file": "dna\\scenario_A_hist_015.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_015",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-16T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_016",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_016.npy",
+      "dna_file": "dna\\scenario_A_hist_016.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_016",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-17T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_017",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_017.npy",
+      "dna_file": "dna\\scenario_A_hist_017.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_017",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-18T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_018",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_018.npy",
+      "dna_file": "dna\\scenario_A_hist_018.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_018",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-19T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_hist_019",
+      "type": "historical",
+      "trajectory_file": "trajectories\\scenario_A_hist_019.npy",
+      "dna_file": "dna\\scenario_A_hist_019.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_hist_019",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2020-01-20T00:00:00+00:00"
+      }
+    },
+    {
+      "bundle_id": "scenario_A_query_001",
+      "type": "query",
+      "trajectory_file": "trajectories\\scenario_A_query_001.npy",
+      "dna_file": "dna\\scenario_A_query_001.npy",
+      "geometry_context": {
+        "LTV": 0.3,
+        "LVC": 0.1,
+        "K": 5.0
+      },
+      "metadata": {
+        "scenario": "A",
+        "regime_id": "R1",
+        "trajectory_id": "scenario_A_query_001",
+        "trajectory_horizon": "60",
+        "state_dim": "45",
+        "dna_version": "v1",
+        "schema_version": "hpvd_input_v1",
+        "timestamp": "2022-09-27T00:00:00+00:00"
+      }
+    }
+  ]
+}

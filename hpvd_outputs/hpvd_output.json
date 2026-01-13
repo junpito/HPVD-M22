@@ -1,0 +1,239 @@
+{
+  "analog_families": [
+    {
+      "family_id": "AF_001",
+      "members": [
+        {
+          "trajectory_id": "scenario_A_hist_034",
+          "confidence": 0.5688598170591297
+        },
+        {
+          "trajectory_id": "scenario_A_hist_071",
+          "confidence": 0.5609600847998841
+        },
+        {
+          "trajectory_id": "scenario_A_hist_049",
+          "confidence": 0.555693818176943
+        },
+        {
+          "trajectory_id": "scenario_A_hist_056",
+          "confidence": 0.5549809546183878
+        },
+        {
+          "trajectory_id": "scenario_A_hist_008",
+          "confidence": 0.5548026522163806
+        },
+        {
+          "trajectory_id": "scenario_A_hist_013",
+          "confidence": 0.5537425662123727
+        },
+        {
+          "trajectory_id": "scenario_A_hist_060",
+          "confidence": 0.551551141811965
+        },
+        {
+          "trajectory_id": "scenario_A_hist_001",
+          "confidence": 0.5483745576841339
+        },
+        {
+          "trajectory_id": "scenario_A_hist_015",
+          "confidence": 0.5483307869513693
+        },
+        {
+          "trajectory_id": "scenario_A_hist_084",
+          "confidence": 0.5455821112521226
+        },
+        {
+          "trajectory_id": "scenario_A_hist_006",
+          "confidence": 0.5453460418055993
+        },
+        {
+          "trajectory_id": "scenario_A_hist_070",
+          "confidence": 0.5446735782762118
+        },
+        {
+          "trajectory_id": "scenario_A_hist_054",
+          "confidence": 0.5410330009583426
+        },
+        {
+          "trajectory_id": "scenario_A_hist_099",
+          "confidence": 0.5395747911073131
+        },
+        {
+          "trajectory_id": "scenario_A_hist_078",
+          "confidence": 0.5375180193518292
+        },
+        {
+          "trajectory_id": "scenario_A_hist_032",
+          "confidence": 0.5366172611526029
+        },
+        {
+          "trajectory_id": "scenario_A_hist_090",
+          "confidence": 0.5353823907364824
+        },
+        {
+          "trajectory_id": "scenario_A_hist_091",
+          "confidence": 0.5350685231508233
+        },
+        {
+          "trajectory_id": "scenario_A_hist_046",
+          "confidence": 0.5335385134384398
+        },
+        {
+          "trajectory_id": "scenario_A_hist_098",
+          "confidence": 0.5313325608058588
+        },
+        {
+          "trajectory_id": "scenario_A_hist_019",
+          "confidence": 0.5303040829023764
+        },
+        {
+          "trajectory_id": "scenario_A_hist_029",
+          "confidence": 0.5295316309137986
+        },
+        {
+          "trajectory_id": "scenario_A_hist_055",
+          "confidence": 0.5286911271863329
+        },
+        {
+          "trajectory_id": "scenario_A_hist_004",
+          "confidence": 0.5269388561743223
+        },
+        {
+          "trajectory_id": "scenario_A_hist_067",
+          "confidence": 0.5269156745593008
+        },
+        {
+          "trajectory_id": "scenario_A_hist_095",
+          "confidence": 0.5256256599557609
+        },
+        {
+          "trajectory_id": "scenario_A_hist_002",
+          "confidence": 0.5253596108073325
+        },
+        {
+          "trajectory_id": "scenario_A_hist_064",
+          "confidence": 0.5251395429724687
+        },
+        {
+          "trajectory_id": "scenario_A_hist_082",
+          "confidence": 0.5235741565969603
+        },
+        {
+          "trajectory_id": "scenario_A_hist_052",
+          "confidence": 0.5229898208744155
+        },
+        {
+          "trajectory_id": "scenario_A_hist_081",
+          "confidence": 0.5227262490628786
+        },
+        {
+          "trajectory_id": "scenario_A_hist_040",
+          "confidence": 0.5218694554699659
+        },
+        {
+          "trajectory_id": "scenario_A_hist_080",
+          "confidence": 0.5217845276009114
+        },
+        {
+          "trajectory_id": "scenario_A_hist_025",
+          "confidence": 0.5216295168279682
+        },
+        {
+          "trajectory_id": "scenario_A_hist_063",
+          "confidence": 0.5213443022925341
+        },
+        {
+          "trajectory_id": "scenario_A_hist_072",
+          "confidence": 0.518670456967322
+        },
+        {
+          "trajectory_id": "scenario_A_hist_039",
+          "confidence": 0.5144675085071575
+        },
+        {
+          "trajectory_id": "scenario_A_hist_042",
+          "confidence": 0.5142036669435134
+        },
+        {
+          "trajectory_id": "scenario_A_hist_058",
+          "confidence": 0.5124427375337359
+        },
+        {
+          "trajectory_id": "scenario_A_hist_022",
+          "confidence": 0.5090662327057055
+        },
+        {
+          "trajectory_id": "scenario_A_hist_047",
+          "confidence": 0.5081208178672436
+        },
+        {
+          "trajectory_id": "scenario_A_hist_057",
+          "confidence": 0.5078697052816923
+        },
+        {
+          "trajectory_id": "scenario_A_hist_092",
+          "confidence": 0.5035044248670036
+        },
+        {
+          "trajectory_id": "scenario_A_hist_076",
+          "confidence": 0.5020447507923097
+        },
+        {
+          "trajectory_id": "scenario_A_hist_011",
+          "confidence": 0.49628678258072045
+        },
+        {
+          "trajectory_id": "scenario_A_hist_009",
+          "confidence": 0.4933880803070583
+        },
+        {
+          "trajectory_id": "scenario_A_hist_073",
+          "confidence": 0.49053065987274713
+        },
+        {
+          "trajectory_id": "scenario_A_hist_036",
+          "confidence": 0.4845683524679022
+        },
+        {
+          "trajectory_id": "scenario_A_hist_020",
+          "confidence": 0.4760483790917096
+        },
+        {
+          "trajectory_id": "scenario_A_hist_062",
+          "confidence": 0.4520134503194002
+        }
+      ],
+      "coherence": {
+        "mean_confidence": 0.5256122678373748,
+        "dispersion": 0.022627306438538903,
+        "size": 50
+      },
+      "structural_signature": {
+        "phase": "stable_expansion",
+        "avg_K": null,
+        "avg_LTV": null,
+        "avg_LVC": null
+      },
+      "uncertainty_flags": {
+        "phase_boundary": false,
+        "weak_support": false,
+        "partial_overlap": false
+      }
+    }
+  ],
+  "retrieval_diagnostics": {
+    "candidates_considered": 100,
+    "candidates_retrieved": 50,
+    "candidates_admitted": 50,
+    "candidates_rejected": 0,
+    "families_formed": 1,
+    "latency_ms": 2.0008087158203125
+  },
+  "metadata": {
+    "hpvd_version": "v1",
+    "query_id": "scenario_A_query_001",
+    "schema_version": "hpvd_output_v1",
+    "timestamp": "2022-09-27T00:00:00+00:00"
+  }
+}

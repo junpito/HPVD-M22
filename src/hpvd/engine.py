@@ -6,11 +6,13 @@ Main search engine combining sparse filtering and dense retrieval.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Set, Tuple
+from typing import List, Dict, Optional, Set, Tuple, Union
+from datetime import datetime
 import time
+import uuid
 import numpy as np
 
-from .trajectory import Trajectory
+from .trajectory import Trajectory, HPVDInputBundle
 from .sparse_index import SparseRegimeIndex
 from .dense_index import DenseTrajectoryIndex, DenseIndexConfig
 from .distance import HybridDistanceCalculator, DistanceConfig
@@ -44,11 +46,105 @@ class HPVDConfig:
 
 @dataclass
 class ForecastResult:
-    """Probabilistic forecast with confidence intervals"""
+    """
+    Placeholder container for downstream probabilistic reasoning.
+
+    Matrix22 note:
+        - HPVD core must **not** compute probabilities, entropy, or
+          confidence intervals based on outcomes.
+        - These fields are kept only for backward-compat with existing
+          demos and will be populated in a structurally neutral way.
+        - Real probabilistic logic belongs in PMR-DB / adapters, not HPVD.
+    """
+
     p_up: float
     p_down: float
     confidence_interval: Tuple[float, float]
     entropy: float
+
+
+@dataclass
+class FamilyMember:
+    """
+    Member reference in an Analog Family.
+    
+    Matrix22: Confidence = structural compatibility, NOT success/outcome.
+    """
+    trajectory_id: str
+    confidence: float  # Structural compatibility score (0-1)
+
+
+@dataclass
+class FamilyCoherence:
+    """
+    Family-level coherence metrics.
+    
+    Matrix22: Descriptive only - HPVD does not "fix" weak families.
+    """
+    mean_confidence: float
+    dispersion: float  # Standard deviation of confidences
+    size: int
+
+
+@dataclass
+class StructuralSignature:
+    """
+    Structural compatibility summary for a family.
+    
+    Matrix22: Descriptive, not evaluative. Allows downstream to compare/weigh.
+    """
+    phase: str  # e.g., "stable_expansion", "compression_transition"
+    avg_K: Optional[float] = None  # Average curvature (if available)
+    avg_LTV: Optional[float] = None  # Average LTV (if available)
+    avg_LVC: Optional[float] = None  # Average LVC (if available)
+
+
+@dataclass
+class UncertaintyFlags:
+    """
+    Explicit honesty markers to prevent overconfidence downstream.
+    
+    Matrix22: These flags exist to prevent overconfidence, not to gate execution.
+    """
+    phase_boundary: bool = False  # Family spans phase boundaries
+    weak_support: bool = False  # Small family size or high dispersion
+    partial_overlap: bool = False  # Family overlaps with others structurally
+
+
+@dataclass
+class AnalogFamily:
+    """
+    Analog Family - coherent group of historical trajectories.
+    
+    Matrix22: An Analog Family is:
+    - a coherent group of historical trajectories
+    - that evolved under compatible structural constraints
+    - and share evolutionary phase identity
+    - with explicit uncertainty preserved
+    
+    It is NOT:
+    - a cluster in feature space
+    - a nearest-neighbor list
+    - a regime label
+    - a template for action
+    """
+    family_id: str  # Purely referential, no semantics, stable across replay
+    members: List[FamilyMember]  # Member references with confidence
+    coherence: FamilyCoherence  # Family-level coherence metrics
+    structural_signature: StructuralSignature  # Structural compatibility summary
+    uncertainty_flags: UncertaintyFlags  # Uncertainty annotations
+
+
+@dataclass
+class HPVD_Output:
+    """
+    HPVD Output - structured empirical evidence in the form of Analog Families.
+    
+    Matrix22: HPVD outputs structured empirical evidence, NOT predictions/probabilities/decisions.
+    """
+    analog_families: List[AnalogFamily]
+    retrieval_diagnostics: Dict[str, int]  # e.g., candidates_considered, families_formed, rejected_candidates
+    metadata: Dict[str, str]  # hpvd_version, query_id, schema_version, timestamp
 
 
 @dataclass
@@ -79,7 +175,7 @@ class SearchResult:
     latency_ms: float
     latency_breakdown: Dict[str, float]
     
-    # Probabilistic forecasts
+    # Probabilistic forecasts (Matrix22: structural placeholders only)
     forecast_h1: Optional[ForecastResult] = None
     forecast_h5: Optional[ForecastResult] = None
     
@@ -87,7 +183,7 @@ class SearchResult:
     aci: float = 0.0
     regime_coherence: float = 0.0
     
-    # Abstention
+    # Abstention (Matrix22: decision must live in Authorization / PMR)
     should_abstain: bool = False
     abstention_reason: str = ""
 
@@ -165,6 +261,321 @@ class HPVDEngine:
         print(f"HPVD built in {elapsed:.2f}s")
         print(f"  Sparse index: {self.sparse_index.get_statistics()['unique_regimes']} regimes")
         print(f"  Dense index: {self.dense_index.ntotal} vectors")
+    
+    def _bundle_to_trajectory(self, bundle: HPVDInputBundle) -> Trajectory:
+        """Convert HPVDInputBundle to Trajectory for internal use"""
+        # Generate embedding from trajectory
+        flat_matrix = bundle.trajectory.flatten()
+        if len(flat_matrix) > 256:
+            embedding = flat_matrix[:256].astype(np.float32)
+        else:
+            embedding = np.pad(flat_matrix, (0, 256 - len(flat_matrix)), mode='constant').astype(np.float32)
+        
+        # Extract regime from metadata or use defaults
+        trend, vol, struct = 0, 0, 0
+        if 'regime_id' in bundle.metadata:
+            regime_id = bundle.metadata['regime_id']
+            if 'R1' in regime_id:
+                trend, vol, struct = 1, 0, 1
+            elif 'R2' in regime_id:
+                trend, vol, struct = -1, 0, -1
+            elif 'R3' in regime_id:
+                trend, vol, struct = 0, 1, 1
+            elif 'R5' in regime_id:
+                trend, vol, struct = 1, 1, -1
+        
+        return Trajectory(
+            trajectory_id=bundle.metadata.get('trajectory_id', str(uuid.uuid4())),
+            asset_id=bundle.metadata.get('asset_id', 'synthetic'),
+            end_timestamp=datetime.fromisoformat(bundle.metadata.get('timestamp', datetime.now().isoformat())) if 'timestamp' in bundle.metadata else datetime.now(),
+            matrix=bundle.trajectory,
+            embedding=embedding,
+            trend_regime=trend,
+            volatility_regime=vol,
+            structural_regime=struct,
+            asset_class='synthetic'
+        )
+    
+    def build_from_bundles(self, bundles: List[HPVDInputBundle]):
+        """
+        Build HPVD from HPVDInputBundle list (Matrix22 canonical method).
+        
+        Args:
+            bundles: List of HPVDInputBundle objects
+        """
+        trajectories = [self._bundle_to_trajectory(b) for b in bundles]
+        self.build(trajectories)
+    
+    def search_families(self,
+                        query: Union[HPVDInputBundle, Trajectory],
+                        max_candidates: int = None) -> HPVD_Output:
+        """
+        Matrix22: Find analog families (new canonical method).
+        
+        Returns structured empirical evidence as Analog Families, NOT predictions.
+        
+        Args:
+            query: Query as HPVDInputBundle (preferred) or Trajectory (legacy)
+            max_candidates: Maximum candidates to consider (default: config.default_k * 5)
+            
+        Returns:
+            HPVD_Output with analog families, diagnostics, and metadata
+        """
+        if not self.is_built:
+            raise RuntimeError("HPVD not built. Call build() first.")
+        
+        # Convert HPVDInputBundle to Trajectory if needed
+        if isinstance(query, HPVDInputBundle):
+            query_trajectory = self._bundle_to_trajectory(query)
+        else:
+            query_trajectory = query
+        
+        max_candidates = max_candidates or (self.config.default_k * 5)
+        latency = {}
+        total_start = time.time()
+        
+        # ========== STAGE 1: Evolutionary Compatibility Screening ==========
+        stage_start = time.time()
+        
+        if self.config.enable_sparse_filter:
+            candidate_ids = self.sparse_index.combined_filter(
+                trend=query_trajectory.trend_regime,
+                volatility=query_trajectory.volatility_regime,
+                structural=query_trajectory.structural_regime,
+                allow_adjacent=True
+            )
+            
+            # Fallback if too few candidates
+            if len(candidate_ids) < self.config.min_candidates:
+                candidate_ids = self.sparse_index.combined_filter(
+                    trend=query_trajectory.trend_regime,
+                    allow_adjacent=True
+                )
+            
+            if len(candidate_ids) < 10:
+                candidate_ids = set(self.trajectories.keys())
+        else:
+            candidate_ids = set(self.trajectories.keys())
+        
+        candidates_after_screening = len(candidate_ids)
+        latency['screening_ms'] = (time.time() - stage_start) * 1000
+        
+        # ========== STAGE 2: Candidate Retrieval (broad, permissive) ==========
+        stage_start = time.time()
+        
+        search_k = min(max_candidates, len(candidate_ids))
+        dense_results = self.dense_index.search_with_filter(
+            query_embedding=query_trajectory.embedding,
+            candidate_ids=candidate_ids,
+            k=search_k
+        )
+        
+        candidates_retrieved = len(dense_results)
+        latency['retrieval_ms'] = (time.time() - stage_start) * 1000
+        
+        # ========== STAGE 3: Multi-Channel Similarity Evaluation ==========
+        stage_start = time.time()
+        
+        query_regime = query_trajectory.get_regime_tuple()
+        evaluated_candidates = []
+        
+        for tid, faiss_dist in dense_results:
+            traj = self.trajectories.get(tid)
+            if traj is None:
+                continue
+            
+            # Compute multi-channel distance components
+            hybrid_dist, components = self.distance_calc.compute(
+                query_trajectory.matrix,
+                traj.matrix,
+                query_regime,
+                traj.get_regime_tuple()
+            )
+            
+            # Confidence = inverse of normalized distance (structural compatibility)
+            # Matrix22: This is descriptive, not a probability
+            confidence = max(0.0, 1.0 - min(hybrid_dist, 1.0))
+            
+            evaluated_candidates.append({
+                'trajectory_id': tid,
+                'trajectory': traj,
+                'confidence': confidence,
+                'hybrid_distance': hybrid_dist,
+                'regime_match': components['regime_match'],
+                'distance_components': components,
+                'regime_tuple': traj.get_regime_tuple()
+            })
+        
+        latency['evaluation_ms'] = (time.time() - stage_start) * 1000
+        
+        # ========== STAGE 4: Probabilistic Neighborhood Admission ==========
+        # Matrix22: Simple threshold-based admission for now
+        # TODO: Implement proper probabilistic admission
+        stage_start = time.time()
+        
+        admission_threshold = 0.3  # Minimum confidence to be admitted
+        admitted = [
+            c for c in evaluated_candidates
+            if c['confidence'] >= admission_threshold
+        ]
+        rejected = [
+            c for c in evaluated_candidates
+            if c['confidence'] < admission_threshold
+        ]
+        
+        latency['admission_ms'] = (time.time() - stage_start) * 1000
+        
+        # ========== STAGE 5: Analog Family Formation ==========
+        stage_start = time.time()
+        
+        families = self._form_analog_families(admitted, query_regime)
+        
+        latency['family_formation_ms'] = (time.time() - stage_start) * 1000
+        
+        # ========== STAGE 6: Uncertainty Annotation ==========
+        # (Already computed during family formation)
+        
+        # ========== STAGE 7: Output Assembly ==========
+        latency['total_ms'] = (time.time() - total_start) * 1000
+        
+        diagnostics = {
+            'candidates_considered': candidates_after_screening,
+            'candidates_retrieved': candidates_retrieved,
+            'candidates_admitted': len(admitted),
+            'candidates_rejected': len(rejected),
+            'families_formed': len(families),
+            'latency_ms': latency['total_ms']
+        }
+        
+        # Extract metadata from query (prefer bundle metadata if available)
+        if isinstance(query, HPVDInputBundle):
+            query_id = query.metadata.get('trajectory_id', query_trajectory.trajectory_id)
+            query_timestamp = query.metadata.get('timestamp', query_trajectory.end_timestamp.isoformat())
+        else:
+            query_id = query_trajectory.trajectory_id
+            query_timestamp = query_trajectory.end_timestamp.isoformat() if hasattr(query_trajectory.end_timestamp, 'isoformat') else str(query_trajectory.end_timestamp)
+        
+        metadata = {
+            'hpvd_version': 'v1',
+            'query_id': query_id,
+            'schema_version': 'hpvd_output_v1',
+            'timestamp': query_timestamp
+        }
+        
+        return HPVD_Output(
+            analog_families=families,
+            retrieval_diagnostics=diagnostics,
+            metadata=metadata
+        )
+    
+    def _form_analog_families(self,
+                               admitted_candidates: List[Dict],
+                               query_regime: Tuple[int, int, int]) -> List[AnalogFamily]:
+        """
+        Form analog families from admitted candidates.
+        
+        Matrix22: Families are not forced to be compact, may overlap,
+        and may be small or large. HPVD never forces a single family or
+        merges incompatible groups.
+        
+        Simple implementation: Group by regime similarity + distance clustering.
+        """
+        if not admitted_candidates:
+            return []
+        
+        # Group by regime tuple (exact match first)
+        regime_groups: Dict[Tuple[int, int, int], List[Dict]] = {}
+        
+        for candidate in admitted_candidates:
+            regime = candidate['regime_tuple']
+            if regime not in regime_groups:
+                regime_groups[regime] = []
+            regime_groups[regime].append(candidate)
+        
+        families = []
+        family_counter = 0
+        
+        # Form one family per regime group (can be refined later)
+        for regime, members in regime_groups.items():
+            if not members:
+                continue
+            
+            family_counter += 1
+            family_id = f"AF_{family_counter:03d}"
+            
+            # Sort members by confidence (descending)
+            members_sorted = sorted(members, key=lambda x: x['confidence'], reverse=True)
+            
+            # Create family members
+            family_members = [
+                FamilyMember(
+                    trajectory_id=m['trajectory_id'],
+                    confidence=m['confidence']
+                )
+                for m in members_sorted
+            ]
+            
+            # Compute coherence
+            confidences = [m['confidence'] for m in members_sorted]
+            mean_conf = float(np.mean(confidences))
+            dispersion = float(np.std(confidences)) if len(confidences) > 1 else 0.0
+            
+            coherence = FamilyCoherence(
+                mean_confidence=mean_conf,
+                dispersion=dispersion,
+                size=len(family_members)
+            )
+            
+            # Structural signature (simplified - can be enhanced with geometry_context)
+            phase_name = self._regime_to_phase_name(regime)
+            structural_sig = StructuralSignature(
+                phase=phase_name,
+                avg_K=None,  # TODO: Extract from geometry_context if available
+                avg_LTV=None,
+                avg_LVC=None
+            )
+            
+            # Uncertainty flags
+            uncertainty = UncertaintyFlags(
+                phase_boundary=self._is_phase_boundary(regime, query_regime),
+                weak_support=(len(family_members) < 5 or dispersion > 0.3),
+                partial_overlap=False  # TODO: Detect overlap with other families
+            )
+            
+            families.append(AnalogFamily(
+                family_id=family_id,
+                members=family_members,
+                coherence=coherence,
+                structural_signature=structural_sig,
+                uncertainty_flags=uncertainty
+            ))
+        
+        return families
+    
+    def _regime_to_phase_name(self, regime: Tuple[int, int, int]) -> str:
+        """Convert regime tuple to descriptive phase name"""
+        trend, vol, struct = regime
+        
+        # Simple mapping (can be enhanced)
+        if trend == 1 and vol == 0 and struct == 1:
+            return "stable_expansion"
+        elif trend == -1 and vol == 0 and struct == -1:
+            return "stable_contraction"
+        elif vol == 1 or struct == 1:
+            return "compression_transition"
+        elif trend == 0 or vol == 0 or struct == 0:
+            return "transitional"
+        else:
+            return "mixed_regime"
+    
+    def _is_phase_boundary(self, candidate_regime: Tuple[int, int, int],
+                          query_regime: Tuple[int, int, int]) -> bool:
+        """Check if candidate is at phase boundary relative to query"""
+        # If any dimension differs by more than 1, it's a boundary
+        for c, q in zip(candidate_regime, query_regime):
+            if abs(c - q) > 1:
+                return True
+        return False
     
     def search(self,
                query_trajectory: Trajectory,
@@ -305,7 +716,7 @@ class HPVDEngine:
             for r in reranked[:k]
         ]
         
-        # ========== STAGE 5: Quality Assessment ==========
+        # ========== STAGE 5: Quality Assessment (descriptive only) ==========
         stage_start = time.time()
         
         aci = self._compute_aci(analogs)
@@ -313,16 +724,10 @@ class HPVDEngine:
         forecast_h1 = self._compute_forecast(analogs, 'h1')
         forecast_h5 = self._compute_forecast(analogs, 'h5')
         
-        # Check abstention
+        # Matrix22: HPVD core must not decide abstention.
+        # Abstention is delegated to downstream authorization / PMR layers.
         should_abstain = False
-        abstention_reason = ""
-        
-        if forecast_h1.entropy > 0.9:
-            should_abstain = True
-            abstention_reason = f"High H1 entropy: {forecast_h1.entropy:.3f}"
-        elif aci < 0.7:
-            should_abstain = True
-            abstention_reason = f"Low ACI: {aci:.3f}"
+        abstention_reason = "abstention delegated to PMR/authorization layer"
         
         latency['quality_ms'] = (time.time() - stage_start) * 1000
         latency['total_ms'] = (time.time() - total_start) * 1000
@@ -365,49 +770,29 @@ class HPVDEngine:
         return float(np.mean(scores))
     
     def _compute_forecast(self, analogs: List[AnalogResult], horizon: str) -> ForecastResult:
-        """Compute probabilistic forecast"""
+        """
+        Compute structurally neutral placeholder for probabilistic forecast.
+
+        Matrix22:
+            - This method MUST NOT use labels/returns or any future outcomes.
+            - It only reports a symmetric, maximally-uncertain prior that
+              downstream systems may later update.
+        """
         if not analogs:
-            return ForecastResult(p_up=0.5, p_down=0.5, 
-                                   confidence_interval=(0.0, 1.0), entropy=1.0)
-        
-        # Distance-based weights
-        alpha = 2.0
-        distances = np.array([a.distance for a in analogs])
-        weights = np.exp(-alpha * distances)
-        weights = weights / weights.sum()
-        
-        # Get outcomes
-        if horizon == 'h1':
-            outcomes = np.array([1.0 if a.label_h1 == 1 else 0.0 for a in analogs])
-        else:
-            outcomes = np.array([1.0 if a.label_h5 == 1 else 0.0 for a in analogs])
-        
-        # Weighted probability
-        p_up = float(np.dot(weights, outcomes))
-        p_down = 1.0 - p_up
-        
-        # Wilson score interval
-        n = len(analogs)
-        z = 1.96
-        
-        denominator = 1 + z**2 / n
-        center = (p_up + z**2 / (2*n)) / denominator
-        spread = z * np.sqrt((p_up * p_down) / n + z**2 / (4*n**2)) / denominator
-        
-        ci_lower = max(0.0, center - spread)
-        ci_upper = min(1.0, center + spread)
-        
-        # Entropy
-        if p_up <= 0 or p_up >= 1:
-            entropy = 0.0
-        else:
-            entropy = -p_up * np.log2(p_up) - p_down * np.log2(p_down)
-        
+            return ForecastResult(
+                p_up=0.5,
+                p_down=0.5,
+                confidence_interval=(0.0, 1.0),
+                entropy=1.0,
+            )
+
+        # Always return neutral, high-entropy prior regardless of analog labels.
+        # This keeps HPVD outcome-blind while preserving the existing schema.
         return ForecastResult(
-            p_up=p_up,
-            p_down=p_down,
-            confidence_interval=(ci_lower, ci_upper),
-            entropy=float(entropy)
+            p_up=0.5,
+            p_down=0.5,
+            confidence_interval=(0.0, 1.0),
+            entropy=1.0,
         )
     
     def get_statistics(self) -> Dict:
