@@ -18,22 +18,33 @@ HPVD (Hybrid Probabilistic Vector Database) is a high-performance vector search 
 ```
 HPVD-M22/
 ├── src/
-│   ├── hpvd/                    # Core HPVD library
+│   ├── hpvd/                        # Core HPVD library
 │   │   ├── __init__.py
-│   │   ├── trajectory.py        # Trajectory data model
-│   │   ├── sparse_index.py      # Regime-based inverted index
-│   │   ├── dense_index.py       # FAISS wrapper
-│   │   ├── distance.py          # Hybrid distance calculator
-│   │   └── engine.py            # Main HPVD engine
-│   └── prototypes/
-│       └── bm25_prototype.py    # BM25 text retrieval demo
-├── tests/                       # Unit tests
-├── docs/                        # Documentation
+│   │   ├── trajectory.py            # Trajectory data model
+│   │   ├── sparse_index.py          # Regime-based inverted index
+│   │   ├── dense_index.py           # FAISS-based ANN index
+│   │   ├── distance.py              # Hybrid distance calculator
+│   │   ├── engine.py                # Main HPVD engine
+│   │   └── synthetic_data_generator.py  # Scenario/synthetic data utilities
+│   ├── prototypes/
+│   │   ├── __init__.py
+│   │   └── bm25_prototype.py        # BM25 text retrieval demo
+│   └── demo_hpvd.py                 # End-to-end demo script
+├── tests/                           # Unit tests
+│   ├── test_sparse_index.py
+│   ├── test_synthetic_scenarios.py
+│   └── test_trajectory.py
+├── docs/                            # Documentation
 │   ├── HPVD_Architecture_Document.md
-│   └── HPVD_Technical_Specification.md
-├── sources/                     # Source documents
-├── requirements.txt             # Dependencies
-├── pyproject.toml              # Project configuration
+│   ├── HPVD_Technical_Specification.md
+│   ├── synthetic_test_results.md
+│   ├── Timeline.md
+│   └── Weekly_Plan_Next_Week.md
+├── synthetic_data/
+│   └── scenario_A/                  # Example synthetic scenario
+├── hpvd_outputs/                    # Example engine outputs
+├── requirements.txt                 # Dependencies
+├── pyproject.toml                   # Project configuration
 └── README.md
 ```
 
