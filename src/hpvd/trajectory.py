@@ -49,6 +49,7 @@ class Trajectory:
         end_timestamp: End date of the 60-day window
         matrix: Raw feature matrix (60, 45)
         embedding: Reduced embedding for FAISS (256,)
+        dna: Cognitive DNA vector encoding evolutionary phase (K-dim)
         label_h1: H1 outcome (+1 or -1)  # DEPRECATED for HPVD core
         label_h5: H5 outcome (+1 or -1)  # DEPRECATED for HPVD core
         return_h1: Actual H1 return (float)  # DEPRECATED for HPVD core
@@ -66,6 +67,7 @@ class Trajectory:
     # Data
     matrix: np.ndarray = field(default_factory=lambda: np.zeros((60, 45), dtype=np.float32))
     embedding: np.ndarray = field(default_factory=lambda: np.zeros(256, dtype=np.float32))
+    dna: np.ndarray = field(default_factory=lambda: np.zeros(16, dtype=np.float32))
 
     # Labels / outcomes (kept for backward-compat; outcome-blind HPVD must ignore)
     label_h1: int = 0
@@ -103,10 +105,12 @@ class Trajectory:
             - `geometry_context` is descriptive only (no thresholds/decisions).
             - `metadata` must be deterministic and must not depend on future info.
         """
-        # Default DNA placeholder if none provided (caller is expected to pass real DNA)
+        # Use stored DNA if none provided; fall back to zero placeholder
         if dna is None:
-            # Minimal placeholder vector; real pipeline should override this.
-            dna = np.zeros(16, dtype=np.float32)
+            if np.any(self.dna != 0):
+                dna = self.dna
+            else:
+                dna = np.zeros(16, dtype=np.float32)
 
         if geometry_context is None:
             geometry_context = {}

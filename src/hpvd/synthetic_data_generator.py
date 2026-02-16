@@ -550,12 +550,171 @@ class SyntheticDataGenerator:
             'query': [query_bundle]
         }
     
+    def generate_scenario_t7_overlap(
+        self,
+        n_per_regime: int = 8
+    ) -> Dict[str, List[HPVDInputBundle]]:
+        """
+        T7: Overlapping Regimes Stress Test
+        
+        History contains multiple regimes (R1, R3, R4) that have
+        structural overlaps. Query is near R4 (transitional).
+        
+        Expected behavior:
+        - Multiple families formed
+        - Clear separation between families
+        - No forced merge of incompatible groups
+        """
+        historical = []
+        
+        # Add trajectories from R1, R3, R4 with some overlap
+        for regime_id in ['R1', 'R3', 'R4']:
+            regime = self.regimes[regime_id]
+            for i in range(n_per_regime):
+                # Add some overlap by blending with adjacent regimes
+                base_traj = self._generate_trajectory_from_regime(regime)
+                
+                # Add slight contamination from other regimes
+                if regime_id == 'R1':
+                    blend_traj = self._generate_trajectory_from_regime(self.regimes['R4'])
+                    trajectory = 0.85 * base_traj + 0.15 * blend_traj
+                elif regime_id == 'R3':
+                    blend_traj = self._generate_trajectory_from_regime(self.regimes['R4'])
+                    trajectory = 0.85 * base_traj + 0.15 * blend_traj
+                else:  # R4
+                    trajectory = base_traj
+                
+                bundle = HPVDInputBundle(
+                    trajectory=trajectory.astype(np.float32),
+                    dna=regime.dna_signature + self.rng.randn(self.K).astype(np.float32) * 0.05,
+                    geometry_context={'LTV': 0.4, 'LVC': 0.2, 'K': 6.0},
+                    metadata={
+                        'scenario': 'T7',
+                        'regime_id': regime_id,
+                        'trajectory_id': f'scenario_T7_hist_{regime_id}_{i:03d}',
+                        'trajectory_horizon': str(self.T),
+                        'state_dim': str(self.D),
+                        'dna_version': 'v1',
+                        'schema_version': 'hpvd_input_v1',
+                        'timestamp': (self.base_date + timedelta(days=7000 + i)).isoformat()
+                    }
+                )
+                historical.append(bundle)
+        
+        # Query: Near R4 (transitional - should match multiple families)
+        query_trajectory = self._generate_trajectory_from_regime(self.regimes['R4'])
+        query_bundle = HPVDInputBundle(
+            trajectory=query_trajectory,
+            dna=self.regimes['R4'].dna_signature,
+            geometry_context={'LTV': 0.45, 'LVC': 0.25, 'K': 6.5},
+            metadata={
+                'scenario': 'T7',
+                'regime_id': 'R4',
+                'trajectory_id': 'scenario_T7_query',
+                'trajectory_horizon': str(self.T),
+                'state_dim': str(self.D),
+                'dna_version': 'v1',
+                'schema_version': 'hpvd_input_v1',
+                'timestamp': (self.base_date + timedelta(days=7100)).isoformat()
+            }
+        )
+        
+        return {
+            'historical': historical,
+            'query': [query_bundle]
+        }
+    
+    def generate_scenario_t8_noise(
+        self,
+        n_historical: int = 15,
+        noise_levels: List[float] = None
+    ) -> Dict[str, List[HPVDInputBundle]]:
+        """
+        T8: Noise Stress Test
+        
+        Same trajectory with increasing noise levels.
+        Tests stability of family formation under perturbation.
+        
+        Expected behavior:
+        - Family remains stable up to noise threshold
+        - Confidence decays gradually
+        - No abrupt collapse or chaotic reassignment
+        """
+        if noise_levels is None:
+            noise_levels = [0.05, 0.1, 0.2, 0.3, 0.5]
+        
+        regime = self.regimes['R1']
+        historical = []
+        
+        # Generate base trajectory
+        base_trajectory = self._generate_trajectory_from_regime(regime, noise_level=0.01)
+        
+        for noise_idx, noise_level in enumerate(noise_levels):
+            for i in range(n_historical // len(noise_levels)):
+                # Same base structure + increasing noise
+                noise = self.rng.randn(self.T, self.D).astype(np.float32) * noise_level
+                trajectory = base_trajectory + noise
+                
+                bundle = HPVDInputBundle(
+                    trajectory=trajectory,
+                    dna=regime.dna_signature + self.rng.randn(self.K).astype(np.float32) * (noise_level * 0.1),
+                    geometry_context={'LTV': 0.3, 'LVC': 0.1, 'K': 5.0},
+                    metadata={
+                        'scenario': 'T8',
+                        'regime_id': 'R1',
+                        'noise_level': str(noise_level),
+                        'trajectory_id': f'scenario_T8_hist_noise{noise_level}_{i:03d}',
+                        'trajectory_horizon': str(self.T),
+                        'state_dim': str(self.D),
+                        'dna_version': 'v1',
+                        'schema_version': 'hpvd_input_v1',
+                        'timestamp': (self.base_date + timedelta(days=8000 + noise_idx * 100 + i)).isoformat()
+                    }
+                )
+                historical.append(bundle)
+        
+        # Query: Clean version (low noise)
+        query_trajectory = base_trajectory + self.rng.randn(self.T, self.D).astype(np.float32) * 0.02
+        query_bundle = HPVDInputBundle(
+            trajectory=query_trajectory,
+            dna=regime.dna_signature,
+            geometry_context={'LTV': 0.3, 'LVC': 0.1, 'K': 5.0},
+            metadata={
+                'scenario': 'T8',
+                'regime_id': 'R1',
+                'noise_level': '0.02',
+                'trajectory_id': 'scenario_T8_query_clean',
+                'trajectory_horizon': str(self.T),
+                'state_dim': str(self.D),
+                'dna_version': 'v1',
+                'schema_version': 'hpvd_input_v1',
+                'timestamp': (self.base_date + timedelta(days=8500)).isoformat()
+            }
+        )
+        
+        return {
+            'historical': historical,
+            'query': [query_bundle]
+        }
+    
     def generate_all_scenarios(self) -> Dict[str, Dict[str, List[HPVDInputBundle]]]:
-        """Generate all 5 scenarios"""
+        """Generate all 5 canonical scenarios (A-E)"""
         return {
             'scenario_A': self.generate_scenario_a(),
             'scenario_B': self.generate_scenario_b(),
             'scenario_C': self.generate_scenario_c(),
             'scenario_D': self.generate_scenario_d(),
             'scenario_E': self.generate_scenario_e()
+        }
+    
+    def generate_all_test_scenarios(self) -> Dict[str, Dict[str, List[HPVDInputBundle]]]:
+        """Generate all test scenarios including T7 and T8"""
+        return {
+            'scenario_A': self.generate_scenario_a(),
+            'scenario_B': self.generate_scenario_b(),
+            'scenario_C': self.generate_scenario_c(),
+            'scenario_D': self.generate_scenario_d(),
+            'scenario_E': self.generate_scenario_e(),
+            'scenario_T7': self.generate_scenario_t7_overlap(),
+            'scenario_T8': self.generate_scenario_t8_noise(),
         }

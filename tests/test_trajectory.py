@@ -173,6 +173,38 @@ class TestTrajectory:
         assert bundle.metadata["custom"] == "yes"
 
 
+    def test_trajectory_with_dna(self):
+        """DNA field is stored and accessible on Trajectory."""
+        dna = np.array([1.0, 0.5, -0.3, 0.0] * 4, dtype=np.float32)
+        traj = Trajectory(
+            matrix=np.random.randn(60, 45).astype(np.float32),
+            embedding=np.random.randn(256).astype(np.float32),
+            dna=dna,
+        )
+
+        assert traj.dna.shape == (16,)
+        np.testing.assert_array_equal(traj.dna, dna)
+
+    def test_trajectory_default_dna(self):
+        """Default DNA is a zero vector."""
+        traj = Trajectory()
+        assert traj.dna.shape == (16,)
+        assert np.all(traj.dna == 0)
+
+    def test_to_hpvd_input_preserves_stored_dna(self):
+        """to_hpvd_input() uses self.dna when no explicit DNA is passed."""
+        stored_dna = np.ones(16, dtype=np.float32) * 0.42
+        traj = Trajectory(
+            matrix=np.random.randn(60, 45).astype(np.float32),
+            embedding=np.random.randn(256).astype(np.float32),
+            dna=stored_dna,
+        )
+
+        bundle = traj.to_hpvd_input()
+
+        np.testing.assert_array_almost_equal(bundle.dna, stored_dna)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
 

@@ -16,6 +16,17 @@ from .trajectory import Trajectory, HPVDInputBundle
 from .sparse_index import SparseRegimeIndex
 from .dense_index import DenseTrajectoryIndex, DenseIndexConfig
 from .distance import HybridDistanceCalculator, DistanceConfig
+from .embedding import EmbeddingComputer
+from .dna_similarity import DNASimilarityCalculator, DNASimilarityConfig
+from .family import (
+    FamilyFormationEngine,
+    FamilyFormationConfig,
+    AnalogFamily,
+    FamilyMember,
+    FamilyCoherence,
+    StructuralSignature,
+    UncertaintyFlags,
+)
 
 
 @dataclass
@@ -27,11 +38,21 @@ class HPVDConfig:
     search_k_multiplier: int = 3
     min_candidates: int = 100
     
+    # Embedding
+    embedding_dim: int = 256
+    
+    # Multi-channel fusion: weight of DNA similarity in fused distance
+    # fused = (1 - dna_weight) * trajectory_dist + dna_weight * dna_dist
+    dna_similarity_weight: float = 0.3
+    
     # Distance config
     distance_config: DistanceConfig = None
     
     # Index config
     dense_index_config: DenseIndexConfig = None
+    
+    # Family formation config
+    family_config: FamilyFormationConfig = None
     
     # Feature flags
     enable_sparse_filter: bool = True
@@ -42,6 +63,8 @@ class HPVDConfig:
             self.distance_config = DistanceConfig()
         if self.dense_index_config is None:
             self.dense_index_config = DenseIndexConfig()
+        if self.family_config is None:
+            self.family_config = FamilyFormationConfig()
 
 
 @dataclass
@@ -63,76 +86,8 @@ class ForecastResult:
     entropy: float
 
 
-@dataclass
-class FamilyMember:
-    """
-    Member reference in an Analog Family.
-    
-    Matrix22: Confidence = structural compatibility, NOT success/outcome.
-    """
-    trajectory_id: str
-    confidence: float  # Structural compatibility score (0-1)
-
-
-@dataclass
-class FamilyCoherence:
-    """
-    Family-level coherence metrics.
-    
-    Matrix22: Descriptive only - HPVD does not "fix" weak families.
-    """
-    mean_confidence: float
-    dispersion: float  # Standard deviation of confidences
-    size: int
-
-
-@dataclass
-class StructuralSignature:
-    """
-    Structural compatibility summary for a family.
-    
-    Matrix22: Descriptive, not evaluative. Allows downstream to compare/weigh.
-    """
-    phase: str  # e.g., "stable_expansion", "compression_transition"
-    avg_K: Optional[float] = None  # Average curvature (if available)
-    avg_LTV: Optional[float] = None  # Average LTV (if available)
-    avg_LVC: Optional[float] = None  # Average LVC (if available)
-
-
-@dataclass
-class UncertaintyFlags:
-    """
-    Explicit honesty markers to prevent overconfidence downstream.
-    
-    Matrix22: These flags exist to prevent overconfidence, not to gate execution.
-    """
-    phase_boundary: bool = False  # Family spans phase boundaries
-    weak_support: bool = False  # Small family size or high dispersion
-    partial_overlap: bool = False  # Family overlaps with others structurally
-
-
-@dataclass
-class AnalogFamily:
-    """
-    Analog Family - coherent group of historical trajectories.
-    
-    Matrix22: An Analog Family is:
-    - a coherent group of historical trajectories
-    - that evolved under compatible structural constraints
-    - and share evolutionary phase identity
-    - with explicit uncertainty preserved
-    
-    It is NOT:
-    - a cluster in feature space
-    - a nearest-neighbor list
-    - a regime label
-    - a template for action
-    """
-    family_id: str  # Purely referential, no semantics, stable across replay
-    members: List[FamilyMember]  # Member references with confidence
-    coherence: FamilyCoherence  # Family-level coherence metrics
-    structural_signature: StructuralSignature  # Structural compatibility summary
-    uncertainty_flags: UncertaintyFlags  # Uncertainty annotations
+# Note: FamilyMember, FamilyCoherence, StructuralSignature, UncertaintyFlags,
+# and AnalogFamily are now imported from .family module
 
 
 @dataclass
@@ -214,6 +169,15 @@ class HPVDEngine:
         # Distance calculator
         self.distance_calc = HybridDistanceCalculator(self.config.distance_config)
         
+        # Embedding computer (PCA-based)
+        self.embedding_computer = EmbeddingComputer(self.config.embedding_dim)
+        
+        # DNA similarity calculator
+        self.dna_calculator = DNASimilarityCalculator()
+        
+        # Family formation engine
+        self.family_engine = FamilyFormationEngine(self.config.family_config)
+        
         # State
         self.is_built = False
     
@@ -262,16 +226,9 @@ class HPVDEngine:
         print(f"  Sparse index: {self.sparse_index.get_statistics()['unique_regimes']} regimes")
         print(f"  Dense index: {self.dense_index.ntotal} vectors")
     
-    def _bundle_to_trajectory(self, bundle: HPVDInputBundle) -> Trajectory:
-        """Convert HPVDInputBundle to Trajectory for internal use"""
-        # Generate embedding from trajectory
-        flat_matrix = bundle.trajectory.flatten()
-        if len(flat_matrix) > 256:
-            embedding = flat_matrix[:256].astype(np.float32)
-        else:
-            embedding = np.pad(flat_matrix, (0, 256 - len(flat_matrix)), mode='constant').astype(np.float32)
-        
-        # Extract regime from metadata or use defaults
+    @staticmethod
+    def _extract_regime_from_bundle(bundle: HPVDInputBundle) -> Tuple[int, int, int]:
+        """Extract regime tuple from bundle metadata."""
         trend, vol, struct = 0, 0, 0
         if 'regime_id' in bundle.metadata:
             regime_id = bundle.metadata['regime_id']
@@ -283,27 +240,87 @@ class HPVDEngine:
                 trend, vol, struct = 0, 1, 1
             elif 'R5' in regime_id:
                 trend, vol, struct = 1, 1, -1
-        
+        return trend, vol, struct
+
+    def _bundle_to_trajectory(
+        self,
+        bundle: HPVDInputBundle,
+        embedding: Optional[np.ndarray] = None,
+    ) -> Trajectory:
+        """
+        Convert HPVDInputBundle to Trajectory for internal use.
+
+        Args:
+            bundle: Input bundle with trajectory, dna, geometry, metadata.
+            embedding: Pre-computed PCA embedding.  When *None* the engine
+                       falls back to a naive truncation (for queries when
+                       PCA is already fitted, use ``self.embedding_computer``
+                       from the caller).
+        """
+        if embedding is None:
+            if self.embedding_computer.is_fitted:
+                embedding = self.embedding_computer.transform(bundle.trajectory)
+            else:
+                # Fallback: naive truncation (pre-PCA build path)
+                flat_matrix = bundle.trajectory.flatten()
+                if len(flat_matrix) > self.config.embedding_dim:
+                    embedding = flat_matrix[: self.config.embedding_dim].astype(np.float32)
+                else:
+                    embedding = np.pad(
+                        flat_matrix,
+                        (0, self.config.embedding_dim - len(flat_matrix)),
+                        mode="constant",
+                    ).astype(np.float32)
+
+        trend, vol, struct = self._extract_regime_from_bundle(bundle)
+
         return Trajectory(
             trajectory_id=bundle.metadata.get('trajectory_id', str(uuid.uuid4())),
             asset_id=bundle.metadata.get('asset_id', 'synthetic'),
-            end_timestamp=datetime.fromisoformat(bundle.metadata.get('timestamp', datetime.now().isoformat())) if 'timestamp' in bundle.metadata else datetime.now(),
+            end_timestamp=(
+                datetime.fromisoformat(bundle.metadata['timestamp'])
+                if 'timestamp' in bundle.metadata
+                else datetime.now()
+            ),
             matrix=bundle.trajectory,
             embedding=embedding,
+            dna=bundle.dna.astype(np.float32),
             trend_regime=trend,
             volatility_regime=vol,
             structural_regime=struct,
-            asset_class='synthetic'
+            asset_class='synthetic',
         )
     
     def build_from_bundles(self, bundles: List[HPVDInputBundle]):
         """
         Build HPVD from HPVDInputBundle list (Matrix22 canonical method).
-        
+
+        Steps:
+            1. Fit PCA embedding on all trajectory matrices.
+            2. Batch-transform matrices into meaningful 256-dim embeddings.
+            3. Convert bundles to Trajectory objects (with PCA embeddings + DNA).
+            4. Delegate to ``self.build()`` for index construction.
+
         Args:
             bundles: List of HPVDInputBundle objects
         """
-        trajectories = [self._bundle_to_trajectory(b) for b in bundles]
+        if not bundles:
+            self.build([])
+            return
+
+        # Collect all matrices and fit PCA
+        matrices = np.array([b.trajectory for b in bundles])
+        self.embedding_computer.fit(matrices)
+
+        # Batch-transform to get meaningful embeddings
+        embeddings = self.embedding_computer.transform_batch(matrices)
+
+        # Convert each bundle with its pre-computed embedding
+        trajectories = [
+            self._bundle_to_trajectory(bundle, embedding=embeddings[i])
+            for i, bundle in enumerate(bundles)
+        ]
+
         self.build(trajectories)
     
     def search_families(self,
@@ -377,6 +394,8 @@ class HPVDEngine:
         stage_start = time.time()
         
         query_regime = query_trajectory.get_regime_tuple()
+        dna_weight = self.config.dna_similarity_weight
+        traj_weight = 1.0 - dna_weight
         evaluated_candidates = []
         
         for tid, faiss_dist in dense_results:
@@ -384,7 +403,7 @@ class HPVDEngine:
             if traj is None:
                 continue
             
-            # Compute multi-channel distance components
+            # Channel 1: Trajectory hybrid distance (euclidean + cosine + temporal + regime)
             hybrid_dist, components = self.distance_calc.compute(
                 query_trajectory.matrix,
                 traj.matrix,
@@ -392,15 +411,28 @@ class HPVDEngine:
                 traj.get_regime_tuple()
             )
             
-            # Confidence = inverse of normalized distance (structural compatibility)
+            # Channel 2: DNA similarity (evolutionary phase compatibility)
+            dna_sim, dna_components = self.dna_calculator.compute(
+                query_trajectory.dna,
+                traj.dna,
+            )
+            dna_distance = 1.0 - dna_sim
+            
+            # Multi-channel fusion
+            fused_distance = traj_weight * hybrid_dist + dna_weight * dna_distance
+            
+            # Confidence = inverse of normalized fused distance
             # Matrix22: This is descriptive, not a probability
-            confidence = max(0.0, 1.0 - min(hybrid_dist, 1.0))
+            confidence = max(0.0, 1.0 - min(fused_distance, 1.0))
             
             evaluated_candidates.append({
                 'trajectory_id': tid,
                 'trajectory': traj,
                 'confidence': confidence,
                 'hybrid_distance': hybrid_dist,
+                'fused_distance': fused_distance,
+                'dna_similarity': dna_sim,
+                'dna_components': dna_components,
                 'regime_match': components['regime_match'],
                 'distance_components': components,
                 'regime_tuple': traj.get_regime_tuple()
@@ -474,108 +506,13 @@ class HPVDEngine:
         """
         Form analog families from admitted candidates.
         
+        Delegates to FamilyFormationEngine for actual family formation logic.
+        
         Matrix22: Families are not forced to be compact, may overlap,
         and may be small or large. HPVD never forces a single family or
         merges incompatible groups.
-        
-        Simple implementation: Group by regime similarity + distance clustering.
         """
-        if not admitted_candidates:
-            return []
-        
-        # Group by regime tuple (exact match first)
-        regime_groups: Dict[Tuple[int, int, int], List[Dict]] = {}
-        
-        for candidate in admitted_candidates:
-            regime = candidate['regime_tuple']
-            if regime not in regime_groups:
-                regime_groups[regime] = []
-            regime_groups[regime].append(candidate)
-        
-        families = []
-        family_counter = 0
-        
-        # Form one family per regime group (can be refined later)
-        for regime, members in regime_groups.items():
-            if not members:
-                continue
-            
-            family_counter += 1
-            family_id = f"AF_{family_counter:03d}"
-            
-            # Sort members by confidence (descending)
-            members_sorted = sorted(members, key=lambda x: x['confidence'], reverse=True)
-            
-            # Create family members
-            family_members = [
-                FamilyMember(
-                    trajectory_id=m['trajectory_id'],
-                    confidence=m['confidence']
-                )
-                for m in members_sorted
-            ]
-            
-            # Compute coherence
-            confidences = [m['confidence'] for m in members_sorted]
-            mean_conf = float(np.mean(confidences))
-            dispersion = float(np.std(confidences)) if len(confidences) > 1 else 0.0
-            
-            coherence = FamilyCoherence(
-                mean_confidence=mean_conf,
-                dispersion=dispersion,
-                size=len(family_members)
-            )
-            
-            # Structural signature (simplified - can be enhanced with geometry_context)
-            phase_name = self._regime_to_phase_name(regime)
-            structural_sig = StructuralSignature(
-                phase=phase_name,
-                avg_K=None,  # TODO: Extract from geometry_context if available
-                avg_LTV=None,
-                avg_LVC=None
-            )
-            
-            # Uncertainty flags
-            uncertainty = UncertaintyFlags(
-                phase_boundary=self._is_phase_boundary(regime, query_regime),
-                weak_support=(len(family_members) < 5 or dispersion > 0.3),
-                partial_overlap=False  # TODO: Detect overlap with other families
-            )
-            
-            families.append(AnalogFamily(
-                family_id=family_id,
-                members=family_members,
-                coherence=coherence,
-                structural_signature=structural_sig,
-                uncertainty_flags=uncertainty
-            ))
-        
-        return families
-    
-    def _regime_to_phase_name(self, regime: Tuple[int, int, int]) -> str:
-        """Convert regime tuple to descriptive phase name"""
-        trend, vol, struct = regime
-        
-        # Simple mapping (can be enhanced)
-        if trend == 1 and vol == 0 and struct == 1:
-            return "stable_expansion"
-        elif trend == -1 and vol == 0 and struct == -1:
-            return "stable_contraction"
-        elif vol == 1 or struct == 1:
-            return "compression_transition"
-        elif trend == 0 or vol == 0 or struct == 0:
-            return "transitional"
-        else:
-            return "mixed_regime"
-    
-    def _is_phase_boundary(self, candidate_regime: Tuple[int, int, int],
-                          query_regime: Tuple[int, int, int]) -> bool:
-        """Check if candidate is at phase boundary relative to query"""
-        # If any dimension differs by more than 1, it's a boundary
-        for c, q in zip(candidate_regime, query_regime):
-            if abs(c - q) > 1:
-                return True
-        return False
+        return self.family_engine.form_families(admitted_candidates, query_regime)
     
     def search(self,
                query_trajectory: Trajectory,
@@ -637,8 +574,11 @@ class HPVDEngine:
         candidates_after_dense = len(dense_results)
         latency['dense_search_ms'] = (time.time() - stage_start) * 1000
         
-        # ========== STAGE 3: Hybrid Reranking ==========
+        # ========== STAGE 3: Hybrid Reranking (with DNA fusion) ==========
         stage_start = time.time()
+        
+        dna_w = self.config.dna_similarity_weight
+        traj_w = 1.0 - dna_w
         
         if self.config.enable_reranking:
             reranked = []
@@ -656,10 +596,16 @@ class HPVDEngine:
                     traj.get_regime_tuple()
                 )
                 
+                # DNA channel
+                dna_sim, _ = self.dna_calculator.compute(
+                    query_trajectory.dna, traj.dna
+                )
+                fused_distance = traj_w * hybrid_dist + dna_w * (1.0 - dna_sim)
+                
                 reranked.append({
                     'trajectory_id': tid,
                     'asset_id': traj.asset_id,
-                    'hybrid_distance': hybrid_dist,
+                    'hybrid_distance': fused_distance,
                     'faiss_distance': faiss_dist,
                     'label_h1': traj.label_h1,
                     'label_h5': traj.label_h5,
@@ -814,6 +760,9 @@ class HPVDEngine:
         self.sparse_index.save(f"{path}/sparse_index.pkl")
         self.dense_index.save(f"{path}/dense_index")
         
+        if self.embedding_computer.is_fitted:
+            self.embedding_computer.save(f"{path}/embedding_pca.pkl")
+        
         with open(f"{path}/trajectories.pkl", 'wb') as f:
             pickle.dump(self.trajectories, f)
         
@@ -824,6 +773,7 @@ class HPVDEngine:
     
     def load(self, path: str):
         """Load HPVD from disk"""
+        import os
         import pickle
         
         with open(f"{path}/config.pkl", 'rb') as f:
@@ -839,6 +789,15 @@ class HPVDEngine:
         self.dense_index.load(f"{path}/dense_index")
         
         self.distance_calc = HybridDistanceCalculator(self.config.distance_config)
+        
+        # Restore embedding computer if saved
+        pca_path = f"{path}/embedding_pca.pkl"
+        self.embedding_computer = EmbeddingComputer(self.config.embedding_dim)
+        if os.path.exists(pca_path):
+            self.embedding_computer.load(pca_path)
+        
+        # Restore DNA calculator
+        self.dna_calculator = DNASimilarityCalculator()
         
         self.is_built = True
         print(f"HPVD loaded from {path}: {len(self.trajectories)} trajectories")
