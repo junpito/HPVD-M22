@@ -8,8 +8,10 @@ Main search engine combining sparse filtering and dense retrieval.
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Set, Tuple, Union
 from datetime import datetime
+import json
 import time
 import uuid
+import warnings
 import numpy as np
 
 from .trajectory import Trajectory, HPVDInputBundle
@@ -101,6 +103,134 @@ class HPVD_Output:
     retrieval_diagnostics: Dict[str, int]  # e.g., candidates_considered, families_formed, rejected_candidates
     metadata: Dict[str, str]  # hpvd_version, query_id, schema_version, timestamp
 
+    # ------------------------------------------------------------------
+    # Serialization helpers (hpvd_output_v1 contract)
+    # ------------------------------------------------------------------
+
+    def to_dict(self) -> Dict:
+        """
+        Serialize to a plain dict following the ``hpvd_output_v1`` schema.
+
+        The output is JSON-safe (no numpy/datetime objects).
+        """
+        return {
+            "metadata": dict(self.metadata),
+            "retrieval_diagnostics": {
+                k: (float(v) if isinstance(v, (np.floating, float)) else int(v))
+                for k, v in self.retrieval_diagnostics.items()
+            },
+            "analog_families": [
+                {
+                    "family_id": af.family_id,
+                    "members": [
+                        {
+                            "trajectory_id": m.trajectory_id,
+                            "confidence": float(m.confidence),
+                        }
+                        for m in af.members
+                    ],
+                    "coherence": {
+                        "mean_confidence": float(af.coherence.mean_confidence),
+                        "dispersion": float(af.coherence.dispersion),
+                        "size": int(af.coherence.size),
+                    },
+                    "structural_signature": {
+                        "phase": af.structural_signature.phase,
+                        "avg_K": (
+                            float(af.structural_signature.avg_K)
+                            if af.structural_signature.avg_K is not None
+                            else None
+                        ),
+                        "avg_LTV": (
+                            float(af.structural_signature.avg_LTV)
+                            if af.structural_signature.avg_LTV is not None
+                            else None
+                        ),
+                        "avg_LVC": (
+                            float(af.structural_signature.avg_LVC)
+                            if af.structural_signature.avg_LVC is not None
+                            else None
+                        ),
+                    },
+                    "uncertainty_flags": {
+                        "phase_boundary": af.uncertainty_flags.phase_boundary,
+                        "weak_support": af.uncertainty_flags.weak_support,
+                        "partial_overlap": af.uncertainty_flags.partial_overlap,
+                    },
+                }
+                for af in self.analog_families
+            ],
+        }
+
+    def to_json(self, **kwargs) -> str:
+        """Return a JSON string (``hpvd_output_v1`` schema).
+
+        Extra *kwargs* are forwarded to ``json.dumps`` (e.g. ``indent=2``).
+        """
+        kwargs.setdefault("ensure_ascii", False)
+        return json.dumps(self.to_dict(), **kwargs)
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "HPVD_Output":
+        """Reconstruct an ``HPVD_Output`` from a dict produced by ``to_dict()``.
+
+        Raises ``ValueError`` if required keys are missing or
+        ``schema_version`` is not ``hpvd_output_v1``.
+        """
+        # --- validate top-level keys ---
+        for key in ("metadata", "retrieval_diagnostics", "analog_families"):
+            if key not in data:
+                raise ValueError(f"Missing required key: {key}")
+
+        schema = data["metadata"].get("schema_version")
+        if schema != "hpvd_output_v1":
+            raise ValueError(
+                f"Unsupported schema_version: {schema!r} (expected 'hpvd_output_v1')"
+            )
+
+        families: List[AnalogFamily] = []
+        for af_data in data["analog_families"]:
+            members = [
+                FamilyMember(
+                    trajectory_id=m["trajectory_id"],
+                    confidence=float(m["confidence"]),
+                )
+                for m in af_data["members"]
+            ]
+            coherence = FamilyCoherence(
+                mean_confidence=float(af_data["coherence"]["mean_confidence"]),
+                dispersion=float(af_data["coherence"]["dispersion"]),
+                size=int(af_data["coherence"]["size"]),
+            )
+            sig = af_data["structural_signature"]
+            structural_signature = StructuralSignature(
+                phase=sig["phase"],
+                avg_K=float(sig["avg_K"]) if sig.get("avg_K") is not None else None,
+                avg_LTV=float(sig["avg_LTV"]) if sig.get("avg_LTV") is not None else None,
+                avg_LVC=float(sig["avg_LVC"]) if sig.get("avg_LVC") is not None else None,
+            )
+            uf = af_data["uncertainty_flags"]
+            uncertainty_flags = UncertaintyFlags(
+                phase_boundary=bool(uf["phase_boundary"]),
+                weak_support=bool(uf["weak_support"]),
+                partial_overlap=bool(uf["partial_overlap"]),
+            )
+            families.append(
+                AnalogFamily(
+                    family_id=af_data["family_id"],
+                    members=members,
+                    coherence=coherence,
+                    structural_signature=structural_signature,
+                    uncertainty_flags=uncertainty_flags,
+                )
+            )
+
+        return cls(
+            analog_families=families,
+            retrieval_diagnostics=dict(data["retrieval_diagnostics"]),
+            metadata=dict(data["metadata"]),
+        )
+
 
 @dataclass
 class AnalogResult:
@@ -183,11 +313,21 @@ class HPVDEngine:
     
     def build(self, trajectories: List[Trajectory]):
         """
-        Build indexes from trajectory list
-        
+        Build indexes from trajectory list.
+
+        .. deprecated::
+            Use ``build_from_bundles(bundles)`` instead.
+            This method is kept for backward compatibility only.
+
         Args:
             trajectories: List of Trajectory objects
         """
+        warnings.warn(
+            "HPVDEngine.build() is deprecated. "
+            "Use build_from_bundles(List[HPVDInputBundle]) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         print(f"Building HPVD with {len(trajectories)} trajectories...")
         start_time = time.time()
         
@@ -342,6 +482,15 @@ class HPVDEngine:
             raise RuntimeError("HPVD not built. Call build() first.")
         
         # Convert HPVDInputBundle to Trajectory if needed
+        if isinstance(query, HPVDInputBundle):
+            query.validate()
+        elif isinstance(query, Trajectory):
+            warnings.warn(
+                "Passing Trajectory to search_families() is deprecated. "
+                "Use HPVDInputBundle instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         if isinstance(query, HPVDInputBundle):
             query_trajectory = self._bundle_to_trajectory(query)
         else:

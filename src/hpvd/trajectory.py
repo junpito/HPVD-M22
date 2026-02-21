@@ -23,12 +23,68 @@ class HPVDInputBundle:
         - dna: compressed evolutionary phase vector (no outcomes)
         - geometry_context: descriptive structural metrics (no thresholds/decisions)
         - metadata: deterministic, replayable identifiers (no future info)
+
+    Contract (frozen for MVP):
+        - trajectory shape must be (T, D) with T > 0, D > 0
+        - dna must be 1-D float array
+        - geometry_context must be dict[str, float]
+        - metadata must be dict[str, str]
     """
 
     trajectory: np.ndarray
     dna: np.ndarray
     geometry_context: Dict[str, float]
     metadata: Dict[str, str]
+
+    # Forbidden outcome fields — if any key below appears in metadata,
+    # validate() will reject the bundle.
+    _OUTCOME_KEYS = frozenset({
+        'label_h1', 'label_h5', 'return_h1', 'return_h5',
+        'p_up', 'p_down', 'entropy', 'confidence_interval',
+    })
+
+    def validate(self) -> bool:
+        """
+        Validate bundle against the frozen MVP contract.
+
+        Returns:
+            True if valid.
+
+        Raises:
+            ValueError: with a descriptive message on the first violation found.
+        """
+        # --- trajectory ---
+        if not isinstance(self.trajectory, np.ndarray):
+            raise ValueError(f"trajectory must be np.ndarray, got {type(self.trajectory).__name__}")
+        if self.trajectory.ndim != 2:
+            raise ValueError(f"trajectory must be 2-D (T, D), got shape {self.trajectory.shape}")
+        if self.trajectory.shape[0] == 0 or self.trajectory.shape[1] == 0:
+            raise ValueError(f"trajectory dimensions must be > 0, got shape {self.trajectory.shape}")
+        if np.isnan(self.trajectory).any():
+            raise ValueError("trajectory contains NaN values")
+
+        # --- dna ---
+        if not isinstance(self.dna, np.ndarray):
+            raise ValueError(f"dna must be np.ndarray, got {type(self.dna).__name__}")
+        if self.dna.ndim != 1:
+            raise ValueError(f"dna must be 1-D, got shape {self.dna.shape}")
+
+        # --- geometry_context ---
+        if not isinstance(self.geometry_context, dict):
+            raise ValueError(f"geometry_context must be dict, got {type(self.geometry_context).__name__}")
+
+        # --- metadata ---
+        if not isinstance(self.metadata, dict):
+            raise ValueError(f"metadata must be dict, got {type(self.metadata).__name__}")
+
+        # --- outcome-blind guard ---
+        leaked = self._OUTCOME_KEYS & set(self.metadata.keys())
+        if leaked:
+            raise ValueError(
+                f"metadata contains outcome fields (violates outcome-blind contract): {leaked}"
+            )
+
+        return True
 
 
 @dataclass

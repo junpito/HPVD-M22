@@ -66,6 +66,18 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
 addopts = "-v --tb=short"
+filterwarnings = [
+    # Suppress SWIG/FAISS DeprecationWarnings (not actionable from user code)
+    "ignore::DeprecationWarning:swigfaiss",
+    "ignore::DeprecationWarning:faiss",
+    "ignore:__init__:DeprecationWarning:faiss",
+    "ignore:builtin type Swig:DeprecationWarning",
+    "ignore:builtin type swigvarlink:DeprecationWarning",
+    # Suppress internal numpy RuntimeWarnings in correlation (novel/zero-variance scenarios)
+    "ignore:invalid value encountered in divide:RuntimeWarning",
+    # Keep our own deprecation warnings visible
+    "default::DeprecationWarning:src.hpvd",
+]
 
 [tool.black]
 line-length = 100
