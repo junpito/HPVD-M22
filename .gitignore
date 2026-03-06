@@ -34,6 +34,7 @@ venv.bak/
 .vscode/
 .idea/
 .cursor/
+.github/
 .sources/
 *.swp
 *.swo

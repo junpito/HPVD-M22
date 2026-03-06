@@ -44,6 +44,25 @@ from .engine import (
     HPVDEngine, HPVDConfig, SearchResult, AnalogResult, HPVD_Output
 )
 
+# Matrix22: Adapter layer (strategy pattern, J-file schemas, pipeline)
+from .adapters import (
+    RetrievalStrategy,
+    RetrievalCandidate,
+    RetrievalResult,
+    FamilyAssignment,
+    FinanceRetrievalStrategy,
+    DocumentRetrievalStrategy,
+    DocumentChunk,
+    DocumentRetrievalConfig,
+    StrategyDispatcher,
+    HPVDPipelineEngine,
+    PipelineOutput,
+    J13_PostCoreQuery,
+    J14_RetrievalRaw,
+    J15_PhaseFilteredSet,
+    J16_AnalogFamilyAssignment,
+)
+
 __all__ = [
     # Core classes
     "Trajectory",
@@ -77,5 +96,21 @@ __all__ = [
     "create_synthetic_dna",
     # Synthetic data generator
     "SyntheticDataGenerator",
+    # Matrix22: Adapter layer
+    "RetrievalStrategy",
+    "RetrievalCandidate",
+    "RetrievalResult",
+    "FamilyAssignment",
+    "FinanceRetrievalStrategy",
+    "DocumentRetrievalStrategy",
+    "DocumentChunk",
+    "DocumentRetrievalConfig",
+    "StrategyDispatcher",
+    "HPVDPipelineEngine",
+    "PipelineOutput",
+    "J13_PostCoreQuery",
+    "J14_RetrievalRaw",
+    "J15_PhaseFilteredSet",
+    "J16_AnalogFamilyAssignment",
 ]
 
