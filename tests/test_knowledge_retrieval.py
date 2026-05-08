@@ -4,12 +4,6 @@ Knowledge Retrieval Tests — Manithy v1
 
 Test scenarios K1–K7 (from docs/HPVD_CORE.md Section 6.1).
 
-These tests are written BEFORE the implementation and are expected to FAIL
-until KnowledgeRetrievalStrategy is implemented (Step 4c).
-
-All 72 existing tests remain untouched.  This file adds behaviour for the
-new Knowledge Layer retrieval path.
-
 Scenarios
 ---------
 K1  Sector match       — only objects from the requested sector returned
@@ -18,7 +12,7 @@ K3  Mandatory rule_mapping — always present even if no field matches
 K4  Provenance completeness — every candidate has type + provenance
 K5  Empty sector       — unknown sector → empty candidates, no crash
 K6  Determinism        — same input → same candidates (order + content)
-K7  Pipeline integration — J13 → HPVDPipelineEngine → J14/J15/J16 works
+K7  End-to-end         — strategy search + compute_families works
 """
 
 import pytest
@@ -32,7 +26,6 @@ from hpvd.adapters.knowledge_schemas import (
     RuleMappingObject,
 )
 from hpvd.adapters.strategies.knowledge_strategy import KnowledgeRetrievalStrategy
-from hpvd.adapters.pipeline_engine import HPVDPipelineEngine
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +140,6 @@ def test_k1_sector_filter_returns_only_matching_sector(banking_strategy, loan_ob
         {"observed_data": loan_observed, "sector": "banking"}, k=25
     )
     for cand_dict in result.candidates:
-        # candidates are RetrievalCandidate; metadata carries sector info
         assert cand_dict.metadata.get("sector") == "banking", (
             f"Candidate with sector {cand_dict.metadata.get('sector')} leaked into banking result"
         )
@@ -190,21 +182,15 @@ def test_k3_mandatory_rule_mapping_always_returned(banking_strategy):
 
 
 def test_k4_all_candidates_have_type_and_provenance(banking_strategy, loan_observed):
-    """K4: every candidate in J14 must carry 'knowledge_type' and 'provenance'."""
+    """K4: every candidate must carry 'knowledge_type' and 'provenance'."""
     result = banking_strategy.search(
         {"observed_data": loan_observed, "sector": "banking"}, k=25
     )
     assert result.candidates, "Expected at least one candidate"
     for cand in result.candidates:
-        assert "knowledge_type" in cand.metadata, (
-            f"Candidate {cand.candidate_id!r} missing 'knowledge_type' in metadata"
-        )
-        assert "provenance" in cand.metadata, (
-            f"Candidate {cand.candidate_id!r} missing 'provenance' in metadata"
-        )
-        assert cand.metadata["provenance"].get("source"), (
-            f"Candidate {cand.candidate_id!r} has empty provenance.source"
-        )
+        assert "knowledge_type" in cand.metadata
+        assert "provenance" in cand.metadata
+        assert cand.metadata["provenance"].get("source")
 
 
 # ---------------------------------------------------------------------------
@@ -217,9 +203,7 @@ def test_k5_unknown_sector_returns_empty_candidates_no_crash(banking_strategy):
     result = banking_strategy.search(
         {"observed_data": {"amount": 1000}, "sector": "unknown_sector_xyz"}, k=25
     )
-    assert result.candidates == [], (
-        "Unknown sector should return empty candidates list"
-    )
+    assert result.candidates == []
 
 
 # ---------------------------------------------------------------------------
@@ -235,47 +219,37 @@ def test_k6_same_input_same_output(banking_strategy, loan_observed):
 
     ids1 = [c.candidate_id for c in result1.candidates]
     ids2 = [c.candidate_id for c in result2.candidates]
-    assert ids1 == ids2, "Determinism violated: candidate IDs differ between two identical calls"
+    assert ids1 == ids2
 
 
 # ---------------------------------------------------------------------------
-# K7 — Pipeline integration
+# K7 — End-to-end (strategy only, no pipeline engine)
 # ---------------------------------------------------------------------------
 
 
-def test_k7_pipeline_engine_end_to_end(banking_corpus, chatbot_corpus, loan_observed):
-    """K7: J13 → HPVDPipelineEngine → J14/J15/J16 with KnowledgeRetrievalStrategy."""
+def test_k7_strategy_end_to_end(banking_corpus, chatbot_corpus, loan_observed):
+    """K7: KnowledgeRetrievalStrategy search + compute_families works end-to-end."""
     strategy = KnowledgeRetrievalStrategy()
     strategy.build_index(banking_corpus + chatbot_corpus)
 
-    pipeline = HPVDPipelineEngine()
-    pipeline.register_strategy(strategy)
-
-    j13_dict = {
+    query = {
         "query_id": "TEST_K7_001",
-        "scope": {"domain": "knowledge"},
-        "observed_data": loan_observed,
         "sector": "banking",
+        "observed_data": loan_observed,
     }
 
-    output = pipeline.process_query(j13_dict)
+    result = strategy.search(query)
 
-    # J14 — raw candidates present
-    assert output.j14.query_id == "TEST_K7_001"
-    assert output.j14.domain == "knowledge"
-    assert len(output.j14.candidates) > 0, "J14 must contain at least one candidate"
+    # Candidates present
+    assert len(result.candidates) > 0, "Must have at least one candidate"
 
-    # J15 — accepted candidates present
-    assert output.j15.query_id == "TEST_K7_001"
-    assert len(output.j15.accepted) > 0, "J15 must have accepted candidates"
+    # Mandatory: rule_mapping must appear
+    types = {c.metadata.get("knowledge_type") for c in result.candidates}
+    assert "rule_mapping" in types, "rule_mapping must be in candidates"
 
-    # J16 — families present
-    assert output.j16.query_id == "TEST_K7_001"
-    assert output.j16.total_families > 0, "J16 must contain at least one knowledge family"
-
-    # Mandatory: rule_mapping must appear somewhere in J14 candidates
-    j14_types = {c.get("knowledge_type") for c in output.j14.candidates}
-    assert "rule_mapping" in j14_types, "rule_mapping must be in J14 candidates"
+    # Families
+    families = strategy.compute_families(result.candidates)
+    assert len(families) > 0, "Must have at least one knowledge family"
 
 
 # ---------------------------------------------------------------------------

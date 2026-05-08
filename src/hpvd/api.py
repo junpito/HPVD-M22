@@ -13,7 +13,7 @@ Run::
 Endpoints
 ---------
 POST /query
-    Accept a Parser SDK output dict, run the HPVD pipeline, return PipelineOutput.
+    Accept a Parser SDK output dict, run the knowledge retrieval, return results.
 
 GET /health
     Liveness + corpus-size check.
@@ -31,9 +31,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from hpvd.adapters.pipeline_engine import HPVDPipelineEngine
 from hpvd.adapters.strategies.knowledge_strategy import KnowledgeRetrievalStrategy
-from hpvd.kl_loader import KLCorpusLoader
+from hpvd.infra.kl_loader import KLCorpusLoader
 
 load_dotenv()
 
@@ -71,7 +70,7 @@ class HPVDQueryRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize KL corpus and build the pipeline at startup."""
+    """Initialize KL corpus and build the knowledge index at startup."""
     api_key = os.environ.get("KL_API_KEY", "")
     base_url = os.environ.get("KL_BASE_URL", "https://knowledge-layer-production.up.railway.app")
     domain = os.environ.get("KL_DOMAIN", "banking")
@@ -85,10 +84,7 @@ async def lifespan(app: FastAPI):
     strategy = KnowledgeRetrievalStrategy()
     strategy.build_index(corpus)
 
-    pipeline = HPVDPipelineEngine()
-    pipeline.register_strategy(strategy)
-
-    app.state.pipeline = pipeline
+    app.state.strategy = strategy
     app.state.corpus_size = len(corpus)
     app.state.domain = domain
 
@@ -110,7 +106,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="HPVD Knowledge Retrieval API",
     description="REST API for the HPVD knowledge retrieval engine (Manithy v1).",
-    version="1.0.0-alpha3",
+    version="2.0.0-alpha1",
     lifespan=lifespan,
 )
 
@@ -137,13 +133,13 @@ async def key_error_handler(request: Request, exc: KeyError) -> JSONResponse:
 
 @app.post("/query")
 async def query(request: HPVDQueryRequest) -> Dict[str, Any]:
-    """Run the HPVD pipeline and return the full pipeline output.
+    """Run the HPVD knowledge retrieval and return results.
 
     Accepts Parser SDK output format (``observed`` + ``availability``).
-    Internally adapts to the pipeline's J13 envelope; callers do not need
-    to know about J13.
+    Directly calls ``KnowledgeRetrievalStrategy.search()`` and
+    ``compute_families()`` — no J-file envelope or pipeline engine.
 
-    Returns a dict with keys ``j14``, ``j15``, ``j16``.
+    Returns a dict with keys ``candidates``, ``families``, ``diagnostics``.
 
     Raises
     ------
@@ -157,19 +153,28 @@ async def query(request: HPVDQueryRequest) -> Dict[str, Any]:
             detail="Knowledge corpus is empty — Knowledge Layer was unreachable at startup.",
         )
 
-    # Adapt Parser SDK format to internal pipeline envelope (J13).
-    # `availability` is not used by HPVD — it is preserved for downstream
-    # consumers (PMR, Knowledge Builder) via the response context.
-    j13_dict = {
+    # Build query dict for KnowledgeRetrievalStrategy
+    query_dict = {
         "query_id": request.commit_id,
-        "scope": {"domain": "knowledge"},
         "sector": request.sector,
         "observed_data": request.observed,
     }
 
     try:
-        output = app.state.pipeline.process_query(j13_dict)
-        return output.to_dict()
+        strategy: KnowledgeRetrievalStrategy = app.state.strategy
+
+        # Retrieve candidates
+        result = strategy.search(query_dict)
+
+        # Compute families
+        families = strategy.compute_families(result.candidates)
+
+        return {
+            "query_id": request.commit_id,
+            "candidates": [c.to_dict() for c in result.candidates],
+            "families": [f.to_dict() for f in families],
+            "diagnostics": result.diagnostics,
+        }
     except (ValueError, KeyError):
         raise
     except Exception as exc:

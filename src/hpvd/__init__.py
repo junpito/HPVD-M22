@@ -1,116 +1,48 @@
 """
-HPVD - Hybrid Probabilistic Vector Database
-============================================
+HPVD — Knowledge & Document Retrieval Engine
+==============================================
 
-A high-performance vector search engine for finding historical analogs
-in financial trajectory data.
+Retrieval engine for the Manithy pipeline.  HPVD provides two retrieval
+strategies:
 
-Components:
-- SparseRegimeIndex: Regime-based inverted index for filtering
-- DenseTrajectoryIndex: FAISS-based dense vector search
-- HPVDEngine: Main search engine combining sparse + dense
-- HybridDistanceCalculator: Multi-component distance metrics
+    - ``KnowledgeRetrievalStrategy``  — sector-based knowledge object retrieval
+    - ``DocumentRetrievalStrategy``   — semantic vector search over document chunks
 
-Version: 1.0.0-MVP
-Project: Kalibry Finance
+Version: 2.0.0-alpha1  (Manithy refactor)
 """
 
-__version__ = "1.0.0a1"  # MVP version
+__version__ = "2.0.0a1"
 __author__ = "Kalibry Team"
 
-from .trajectory import Trajectory, HPVDInputBundle
-from .synthetic_data_generator import SyntheticDataGenerator
-from .sparse_index import SparseRegimeIndex
-from .dense_index import DenseTrajectoryIndex, DenseIndexConfig
-from .distance import HybridDistanceCalculator, DistanceConfig
-from .embedding import EmbeddingComputer
-from .family import (
-    FamilyFormationEngine,
-    FamilyFormationConfig,
-    AnalogFamily,
-    FamilyMember,
+from .adapters.family_types import (
     FamilyCoherence,
     StructuralSignature,
     UncertaintyFlags,
-    compute_family_similarity,
-)
-from .dna_similarity import (
-    DNASimilarityCalculator,
-    DNASimilarityConfig,
-    extract_phase_from_dna,
-    create_synthetic_dna,
-)
-from .engine import (
-    HPVDEngine, HPVDConfig, SearchResult, AnalogResult, HPVD_Output
 )
 
-# Matrix22: Adapter layer (strategy pattern, J-file schemas, pipeline)
 from .adapters import (
     RetrievalStrategy,
     RetrievalCandidate,
     RetrievalResult,
     FamilyAssignment,
-    FinanceRetrievalStrategy,
     DocumentRetrievalStrategy,
     DocumentChunk,
     DocumentRetrievalConfig,
-    StrategyDispatcher,
-    HPVDPipelineEngine,
-    PipelineOutput,
-    J13_PostCoreQuery,
-    J14_RetrievalRaw,
-    J15_PhaseFilteredSet,
-    J16_AnalogFamilyAssignment,
+    KnowledgeRetrievalStrategy,
 )
 
 __all__ = [
-    # Core classes
-    "Trajectory",
-    "HPVDInputBundle",
-    "SparseRegimeIndex", 
-    "DenseTrajectoryIndex",
-    "DenseIndexConfig",
-    "HybridDistanceCalculator",
-    "DistanceConfig",
-    "HPVDEngine",
-    "HPVDConfig",
-    # Embedding
-    "EmbeddingComputer",
-    # Legacy search result (backward compat)
-    "SearchResult",
-    "AnalogResult",
-    # Matrix22: Family module (refactored)
-    "FamilyFormationEngine",
-    "FamilyFormationConfig",
-    "HPVD_Output",
-    "AnalogFamily",
-    "FamilyMember",
+    # Family types
     "FamilyCoherence",
     "StructuralSignature",
     "UncertaintyFlags",
-    "compute_family_similarity",
-    # Matrix22: DNA similarity module
-    "DNASimilarityCalculator",
-    "DNASimilarityConfig",
-    "extract_phase_from_dna",
-    "create_synthetic_dna",
-    # Synthetic data generator
-    "SyntheticDataGenerator",
-    # Matrix22: Adapter layer
+    # Adapter layer
     "RetrievalStrategy",
     "RetrievalCandidate",
     "RetrievalResult",
     "FamilyAssignment",
-    "FinanceRetrievalStrategy",
     "DocumentRetrievalStrategy",
     "DocumentChunk",
     "DocumentRetrievalConfig",
-    "StrategyDispatcher",
-    "HPVDPipelineEngine",
-    "PipelineOutput",
-    "J13_PostCoreQuery",
-    "J14_RetrievalRaw",
-    "J15_PhaseFilteredSet",
-    "J16_AnalogFamilyAssignment",
+    "KnowledgeRetrievalStrategy",
 ]
-

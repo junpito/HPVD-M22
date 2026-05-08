@@ -17,7 +17,7 @@ Supports three loading modes:
 
 from typing import Any, Dict, List, Optional
 
-from .kl_client import (
+from ..infra.kl_client import (
     KLClient,
     DocumentRead,
     DocumentMetadata,

@@ -2,22 +2,11 @@
 KL Integration Tests
 =====================
 
-Tests for KL Client, Document Loader, and end-to-end HPVD pipeline
+Tests for KL Client, Document Loader, and HPVD retrieval
 using data from the Knowledge Layer API.
 
 Tests marked ``@pytest.mark.integration`` require a live KL API.
 Other tests use mocked responses and run offline.
-
-Usage::
-
-    # Unit tests only (offline, mocked)
-    python -m pytest tests/test_kl_integration.py -k "not integration" -v
-
-    # Integration tests (requires live KL API + API key)
-    KL_API_KEY=kl_xxx python -m pytest tests/test_kl_integration.py -m integration -v
-
-    # All tests
-    python -m pytest tests/test_kl_integration.py -v
 """
 
 import json
@@ -26,7 +15,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from typing import List
 
-from src.hpvd.adapters.kl_client import (
+from src.hpvd.infra.kl_client import (
     KLClient,
     DocumentRead,
     DocumentVersionRead,
@@ -49,7 +38,6 @@ from src.hpvd.adapters.strategies.document_strategy import (
     DocumentRetrievalConfig,
     DocumentRetrievalStrategy,
 )
-from src.hpvd.adapters.pipeline_engine import HPVDPipelineEngine, PipelineOutput
 
 
 # =====================================================================
@@ -399,8 +387,8 @@ class TestKLDocumentLoader:
         for chunk in chunks:
             assert isinstance(chunk, DocumentChunk)
             assert chunk.chunk_id.startswith("kl_")
-            assert chunk.text  # non-empty
-            assert chunk.topic  # mapped from doc type / metadata
+            assert chunk.text
+            assert chunk.topic
 
     def test_load_as_chunks_with_kl_chunks(self):
         """When KL-managed chunks exist, uses actual chunk content."""
@@ -408,7 +396,6 @@ class TestKLDocumentLoader:
         loader = KLDocumentLoader(client)
         chunks = loader.load_as_chunks()
 
-        # Should have 2 chunks per document (from MOCK_CHUNKS) × 8 docs
         assert len(chunks) == len(MOCK_DOCUMENTS) * len(MOCK_CHUNKS)
         for chunk in chunks:
             assert "Intimazione" in chunk.text or "Termine" in chunk.text
@@ -419,7 +406,6 @@ class TestKLDocumentLoader:
         loader = KLDocumentLoader(client)
         chunks = loader.load_as_chunks()
 
-        # All mock documents have metadata.domain = "finance"
         for chunk in chunks:
             assert chunk.topic == "finance"
 
@@ -471,7 +457,6 @@ class TestKLDocumentLoader:
         assert _map_topic("DELIBERA") == "bank_decision"
         assert _map_topic(None) == "unknown"
         assert _map_topic("") == "unknown"
-        # Unknown type returns lowercase
         assert _map_topic("SOME_NEW_TYPE") == "some_new_type"
 
     def test_topic_mapping_prefers_metadata_domain(self):
@@ -530,7 +515,7 @@ class TestSnapshotLoading:
         loader = KLDocumentLoader(client)
         chunks = loader.load_from_snapshot("PINSET_2026W10")
 
-        assert len(chunks) == 2  # 2 items in snapshot
+        assert len(chunks) == 2
         for chunk in chunks:
             assert chunk.metadata.get("synthetic_chunk") is True
             assert chunk.metadata["snapshot_id"] == "PINSET_2026W10"
@@ -575,12 +560,12 @@ class TestSearchLoading:
 
 
 # =====================================================================
-# Unit Tests — Pipeline with mocked KL data
+# Unit Tests — Retrieval with mocked KL data
 # =====================================================================
 
 
-class TestPipelineWithKLData:
-    """Test that KL-sourced DocumentChunks work through the HPVD pipeline."""
+class TestRetrievalWithKLData:
+    """Test that KL-sourced DocumentChunks work through retrieval strategies."""
 
     def _get_mock_chunks(self) -> List[DocumentChunk]:
         """Get DocumentChunks from mocked KL data."""
@@ -600,7 +585,6 @@ class TestPipelineWithKLData:
             DocumentRetrievalConfig(min_similarity=0.0)
         )
         strategy.build_index(chunks)
-        # Should not raise
         assert strategy._is_built
 
     def test_search_returns_candidates(self):
@@ -648,55 +632,18 @@ class TestPipelineWithKLData:
                 assert f.coherence.size > 0
                 assert f.family_id.startswith("DF_")
 
-    def test_full_pipeline_j13_to_j16(self):
-        """Full pipeline: J13 → dispatch → search → J14 → J15 → J16."""
+    def test_search_result_json_serializable(self):
+        """Search result is JSON-serializable."""
         chunks = self._get_mock_chunks()
         strategy = DocumentRetrievalStrategy(
             DocumentRetrievalConfig(min_similarity=0.0)
         )
         strategy.build_index(chunks)
 
-        pipeline = HPVDPipelineEngine(strategies=[strategy])
-
-        j13_dict = {
-            "query_id": "kl_test_q1",
-            "scope": {"domain": "banking"},
-            "allowed_topics": [],
-            "query_payload": {"text": "loan guarantee contract"},
-        }
-
-        out = pipeline.process_query(j13_dict, k=10)
-
-        assert isinstance(out, PipelineOutput)
-        assert out.j14.domain == "document"
-        assert out.j14.query_id == "kl_test_q1"
-        assert len(out.j14.candidates) > 0
-        assert out.j16.total_families >= 1
-
-    def test_pipeline_output_json_serializable(self):
-        """Pipeline output from KL data is JSON-serializable."""
-        chunks = self._get_mock_chunks()
-        strategy = DocumentRetrievalStrategy(
-            DocumentRetrievalConfig(min_similarity=0.0)
-        )
-        strategy.build_index(chunks)
-
-        pipeline = HPVDPipelineEngine(strategies=[strategy])
-
-        j13_dict = {
-            "query_id": "kl_serial_test",
-            "scope": {"domain": "loan"},
-            "allowed_topics": [],
-            "query_payload": {"text": "payment default risk"},
-        }
-
-        out = pipeline.process_query(j13_dict, k=10)
-        d = out.to_dict()
-
-        # Must not raise
+        result = strategy.search({"text": "payment default risk"})
+        d = result.to_dict()
         serialized = json.dumps(d, ensure_ascii=False)
         assert isinstance(serialized, str)
-        assert "kl_serial_test" in serialized
 
 
 # =====================================================================
@@ -724,46 +671,35 @@ class TestKLLiveIntegration:
         self.client.close()
 
     def test_health_check(self):
-        """KL API is reachable."""
         result = self.client.health_check()
         assert result is not None
 
     def test_list_documents(self):
-        """Can list documents."""
         docs = self.client.list_documents(limit=10)
         assert isinstance(docs, list)
 
     def test_list_documents_with_filters(self):
-        """Can list documents with metadata filters."""
         docs = self.client.list_documents(domain="finance", limit=10)
         assert isinstance(docs, list)
 
     def test_search_documents(self):
-        """Can search documents."""
         docs = self.client.search_documents(domain="finance", limit=10)
         assert isinstance(docs, list)
 
     def test_search_candidates(self):
-        """Can search document candidates."""
         candidates = self.client.search_candidates(domain="finance", limit=10)
         assert isinstance(candidates, list)
 
     def test_list_snapshots(self):
-        """Can list snapshots."""
         snapshots = self.client.list_snapshots(limit=10)
         assert isinstance(snapshots, list)
 
     def test_verify_chain(self):
-        """Event chain verification endpoint works."""
         result = self.client.verify_chain()
         assert result is not None
 
-    def test_full_pipeline_from_live_kl(self):
-        """
-        End-to-end test: Live KL API → Loader → HPVD Pipeline → J14/J15/J16.
-
-        Only meaningful after running ``seed_kl_data.py``.
-        """
+    def test_full_retrieval_from_live_kl(self):
+        """End-to-end test: Live KL API → Loader → Strategy → Results."""
         loader = KLDocumentLoader(self.client)
         chunks = loader.load_as_chunks(limit=50)
 
@@ -775,54 +711,8 @@ class TestKLLiveIntegration:
         )
         strategy.build_index(chunks)
 
-        pipeline = HPVDPipelineEngine(strategies=[strategy])
-        j13_dict = {
-            "query_id": "live_kl_test",
-            "scope": {"domain": "banking"},
-            "allowed_topics": [],
-            "query_payload": {"text": "credit risk loan default"},
-        }
+        result = strategy.search({"text": "credit risk loan default"}, k=10)
+        assert len(result.candidates) > 0
 
-        out = pipeline.process_query(j13_dict, k=10)
-        assert isinstance(out, PipelineOutput)
-        assert len(out.j14.candidates) > 0
-        assert out.j16.total_families >= 1
-
-    def test_snapshot_based_pipeline(self):
-        """
-        End-to-end test using snapshot-based loading.
-
-        Only meaningful after running ``seed_kl_data.py``.
-        """
-        snapshots = self.client.list_snapshots(limit=1)
-        if not snapshots:
-            pytest.skip("No snapshots found — run seed_kl_data.py first")
-
-        snapshot_id = snapshots[0]["snapshot_id"]
-        loader = KLDocumentLoader(self.client)
-        chunks = loader.load_from_snapshot(snapshot_id)
-
-        if not chunks:
-            pytest.skip(f"No chunks in snapshot {snapshot_id}")
-
-        strategy = DocumentRetrievalStrategy(
-            DocumentRetrievalConfig(min_similarity=0.0)
-        )
-        strategy.build_index(chunks)
-
-        pipeline = HPVDPipelineEngine(strategies=[strategy])
-        j13_dict = {
-            "query_id": "snapshot_live_test",
-            "scope": {"domain": "banking"},
-            "allowed_topics": [],
-            "query_payload": {"text": "guarantee fidejussione"},
-        }
-
-        out = pipeline.process_query(j13_dict, k=10)
-        assert isinstance(out, PipelineOutput)
-        assert len(out.j14.candidates) > 0
-
-        # Verify lineage includes snapshot info
-        for cand_dict in out.to_dict()["j14"]["candidates"]:
-            # Lineage should trace back through metadata
-            pass  # Just verify no serialization errors
+        families = strategy.compute_families(result.candidates)
+        assert len(families) >= 1

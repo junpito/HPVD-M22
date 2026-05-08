@@ -19,7 +19,7 @@ import pickle
 
 import numpy as np
 
-from ...family import (
+from ..family_types import (
     FamilyCoherence,
     StructuralSignature,
     UncertaintyFlags,

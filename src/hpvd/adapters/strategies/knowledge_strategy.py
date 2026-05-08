@@ -33,7 +33,7 @@ from ..retrieval_strategy import (
     RetrievalResult,
     RetrievalStrategy,
 )
-from ...family import FamilyCoherence, StructuralSignature, UncertaintyFlags
+from ..family_types import FamilyCoherence, StructuralSignature, UncertaintyFlags
 
 
 # ---------------------------------------------------------------------------
